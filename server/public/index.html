@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CCTV Web Viewer</title>
+  <style>
+    body { font-family: sans-serif; margin: 24px; background: #0f172a; color: #e2e8f0; }
+    header { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
+    button { background: #38bdf8; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-weight: 700; color: #0b1220; }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    video { width: 100%; max-width: 960px; border-radius: 10px; background: #111827; }
+    #log { margin-top: 12px; font-family: monospace; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <header>
+    <h2>CCTV Viewer</h2>
+    <button id="btnStart">Request Stream</button>
+    <button id="btnStop" disabled>Stop Stream</button>
+  </header>
+  <video id="remoteVideo" playsinline autoplay controls muted></video>
+  <div id="log"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const SIGNALING_URL = `${location.protocol}//${location.host}`;
+    const socket = io(SIGNALING_URL);
+    const btnStart = document.getElementById('btnStart');
+    const btnStop = document.getElementById('btnStop');
+    const remoteVideo = document.getElementById('remoteVideo');
+    const log = (msg) => document.getElementById('log').textContent += `\n${msg}`;
+
+    socket.emit('register-viewer');
+
+    let pc;
+
+    function createPeer() {
+      const config = {
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      };
+      const pc = new RTCPeerConnection(config);
+      pc.ontrack = (event) => {
+        remoteVideo.srcObject = event.streams[0];
+        log('Track received');
+      };
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          socket.emit('ice-candidate', { target: 'camera', candidate: event.candidate });
+        }
+      };
+      return pc;
+    }
+
+    btnStart.onclick = async () => {
+      if (pc) pc.close();
+      pc = createPeer();
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      socket.emit('viewer-offer', offer);
+      btnStart.disabled = true;
+      btnStop.disabled = false;
+      log('Offer sent');
+    };
+
+    btnStop.onclick = () => {
+      socket.emit('control', { type: 'stop' });
+      pc?.close();
+      pc = null;
+      btnStart.disabled = false;
+      btnStop.disabled = true;
+      remoteVideo.srcObject = null;
+      log('Stop sent');
+    };
+
+    socket.on('camera-answer', async (answer) => {
+      if (!pc) return;
+      await pc.setRemoteDescription(answer);
+      log('Answer set');
+    });
+
+    socket.on('ice-candidate', async ({ candidate }) => {
+      if (pc && candidate) await pc.addIceCandidate(candidate);
+    });
+
+    socket.on('camera-offline', () => {
+      log('Camera offline');
+      btnStart.disabled = false;
+      btnStop.disabled = true;
+    });
+
+    socket.on('no-camera', () => {
+      log('No camera connected');
+      btnStart.disabled = false;
+      btnStop.disabled = true;
+    });
+  </script>
+</body>
+</html>
