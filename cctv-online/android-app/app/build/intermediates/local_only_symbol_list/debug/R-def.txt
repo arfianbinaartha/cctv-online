@@ -1,0 +1,11 @@
+R_DEF: Internal format may change without notice
+local
+color black
+color white
+id btnStart
+id btnStop
+id localView
+id tvStatus
+layout activity_main
+string app_name
+style Theme.CCTV

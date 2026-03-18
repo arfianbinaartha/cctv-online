@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:ns1="http://schemas.android.com/tools">
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+    <string name="app_name">CCTV</string>
+    <style name="Theme.CCTV" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:statusBarColor" ns1:targetApi="l">@color/black</item>
+    </style>
+</resources>
